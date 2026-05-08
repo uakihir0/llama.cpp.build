@@ -13,6 +13,9 @@ on:
         default: "pull/22673/head"
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   build-macos-arm64:
     runs-on: macos-14
