@@ -1,0 +1,66 @@
+name: Build and Release llama-server (MTP)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag (e.g. v0.1.0-mtp)"
+        required: true
+        type: string
+
+jobs:
+  build-macos-arm64:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clone llama.cpp
+        run: git clone https://github.com/ggml-org/llama.cpp.git
+
+      - name: Fetch and merge PR #22673 (MTP Support)
+        working-directory: llama.cpp
+        run: |
+          git fetch origin pull/22673/head:pr-22673
+          git merge --no-ff pr-22673 -m "Merge PR #22673: llama + spec: MTP Support"
+
+      - name: Configure (Metal)
+        working-directory: llama.cpp
+        run: cmake -B build -DGGML_METAL=ON
+
+      - name: Build llama-server
+        working-directory: llama.cpp
+        run: cmake --build build --config Release --target llama-server -j$(sysctl -n hw.ncpu)
+
+      - name: Verify binary
+        working-directory: llama.cpp
+        run: ./build/bin/llama-server --version
+
+      - name: Package binary
+        working-directory: llama.cpp
+        run: |
+          mkdir -p release
+          cp build/bin/llama-server release/
+          cp build/bin/*.metal release/ 2>/dev/null || true
+          cp build/bin/*.dylib release/ 2>/dev/null || true
+          tar -czf llama-server-mtp-macos-arm64.tar.gz -C release .
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: "llama-server MTP ${{ inputs.release_tag }}"
+          body: |
+            llama-server built with PR #22673 (MTP Support) for macOS ARM64 (Apple Silicon).
+
+            ## Usage
+            ```bash
+            tar xzf llama-server-mtp-macos-arm64.tar.gz
+            ./llama-server \
+              -m /path/to/qwen3.6-35b-a3b-mtp.gguf \
+              --spec-type mtp \
+              --spec-draft-n-max 3
+            ```
+          files: llama.cpp/llama-server-mtp-macos-arm64.tar.gz
+          draft: false
+          prerelease: false
