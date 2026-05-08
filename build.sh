@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LLAMA_DIR="${SCRIPT_DIR}/llama.cpp"
-PR_NUMBER=22673
+LLAMA_REF="${1:-pull/22673/head}"
 
 if [ ! -d "${LLAMA_DIR}" ]; then
     echo "Cloning llama.cpp..."
@@ -12,11 +12,9 @@ fi
 
 cd "${LLAMA_DIR}"
 
-if ! git branch --list pr-${PR_NUMBER} | grep -q "pr-${PR_NUMBER}"; then
-    echo "Fetching PR #${PR_NUMBER}..."
-    git fetch origin "pull/${PR_NUMBER}/head:pr-${PR_NUMBER}"
-    git merge --no-ff "pr-${PR_NUMBER}" -m "Merge PR #${PR_NUMBER}: llama + spec: MTP Support"
-fi
+echo "Checking out ref: ${LLAMA_REF}"
+git fetch origin "${LLAMA_REF}:target-ref"
+git checkout target-ref
 
 echo "Configuring build (Metal)..."
 cmake -B build -DGGML_METAL=ON

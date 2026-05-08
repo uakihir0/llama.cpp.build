@@ -7,6 +7,11 @@ on:
         description: "Release tag (e.g. v0.1.0-mtp)"
         required: true
         type: string
+      llama_ref:
+        description: "llama.cpp ref to build (branch, tag, PR ref e.g. pull/22673/head)"
+        required: false
+        default: "pull/22673/head"
+        type: string
 
 jobs:
   build-macos-arm64:
@@ -15,14 +20,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Clone llama.cpp
-        run: git clone https://github.com/ggml-org/llama.cpp.git
-
-      - name: Fetch and merge PR #22673 (MTP Support)
-        working-directory: llama.cpp
+      - name: Clone llama.cpp at specified ref
         run: |
-          git fetch origin pull/22673/head:pr-22673
-          git merge --no-ff pr-22673 -m "Merge PR #22673: llama + spec: MTP Support"
+          git clone https://github.com/ggml-org/llama.cpp.git
+          cd llama.cpp
+          git fetch origin "${{ inputs.llama_ref }}:target-ref"
+          git checkout target-ref
 
       - name: Configure (Metal)
         working-directory: llama.cpp
