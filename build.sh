@@ -22,6 +22,20 @@ cmake -B build -DGGML_METAL=ON
 echo "Building llama-server..."
 cmake --build build --config Release --target llama-server -j"$(sysctl -n hw.ncpu)"
 
+echo "Fixing dylib rpaths..."
+cd "${LLAMA_DIR}/build/bin"
+for bin in llama-server *.dylib; do
+    [ -f "$bin" ] || continue
+    otool -l "$bin" | grep -A2 'cmd LC_RPATH' | grep 'path ' | awk '{print $2}' | while read -r rpath; do
+        install_name_tool -delete_rpath "$rpath" "$bin" 2>/dev/null || true
+    done
+    install_name_tool -add_rpath @executable_path "$bin" 2>/dev/null || true
+done
+for dylib in *.dylib; do
+    [ -f "$dylib" ] || continue
+    install_name_tool -id "@rpath/$dylib" "$dylib"
+done
+
 echo ""
 echo "Build complete: ${LLAMA_DIR}/build/bin/llama-server"
 echo ""

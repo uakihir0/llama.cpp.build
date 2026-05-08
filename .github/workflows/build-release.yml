@@ -49,7 +49,31 @@ jobs:
           cp build/bin/llama-server release/
           cp build/bin/*.metal release/ 2>/dev/null || true
           cp build/bin/*.dylib release/ 2>/dev/null || true
-          tar -czf llama-server-macos-arm64.tar.gz -C release .
+
+      - name: Fix dylib rpaths
+        working-directory: llama.cpp/release
+        run: |
+          # Replace build-time rpaths with @executable_path so binaries find
+          # dylibs in the same directory regardless of where they are extracted.
+          for bin in llama-server *.dylib; do
+            [ -f "$bin" ] || continue
+            # Remove all existing rpaths
+            otool -l "$bin" | grep -A2 'cmd LC_RPATH' | grep 'path ' | awk '{print $2}' | while read -r rpath; do
+              install_name_tool -delete_rpath "$rpath" "$bin" 2>/dev/null || true
+            done
+            # Add @executable_path as the rpath
+            install_name_tool -add_rpath @executable_path "$bin" 2>/dev/null || true
+          done
+
+          # Also fix the install names of dylibs themselves
+          for dylib in *.dylib; do
+            [ -f "$dylib" ] || continue
+            install_name_tool -id "@rpath/$dylib" "$dylib"
+          done
+
+      - name: Create archive
+        working-directory: llama.cpp
+        run: tar -czf llama-server-macos-arm64.tar.gz -C release .
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
